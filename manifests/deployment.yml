@@ -1,0 +1,16 @@
+apiVersion : apps/v1beta1
+kind: Deployment
+metadata:
+  name: "akscluster01"
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: "akscluster01"
+    spec:
+      containers:
+        - name: "akscluster01"
+          image: "conatnerregistry01.azurecr.io/akscluster01"
+          ports:
+          - containerPort: 80
