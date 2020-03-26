@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: conatnerregistry01.azurecr.io
+        username: ${{ secrets.acr_conatnerregistry01_username }}
+        password: ${{ secrets.acr_conatnerregistry01_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/azure-vote" -f  "azure-vote/Dockerfile" -t conatnerregistry01.azurecr.io/akscluster01:${{ github.sha }}
+        docker push conatnerregistry01.azurecr.io/akscluster01:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_akscluster01_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep akscluster01cd0a | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace akscluster01cd0a`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: akscluster01cd0a
+        container-registry-url: conatnerregistry01.azurecr.io
+        container-registry-username: ${{ secrets.acr_conatnerregistry01_username }}
+        container-registry-password: ${{ secrets.acr_conatnerregistry01_password }}
+        secret-name: akscluster01dockerauth
+       
+    - uses: azure/k8s-deploy@v1
+      with:
+        namespace: akscluster01cd0a
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          conatnerregistry01.azurecr.io/akscluster01:${{ github.sha }}
+        imagepullsecrets: |
+          akscluster01dockerauth
